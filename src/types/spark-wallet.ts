@@ -192,4 +192,5 @@ export interface WalletContextType extends WalletState {
   // Utility
   cleanupConnections: () => Promise<void>;
   clearError: () => void;
+  clearActivityHistory: () => void;
 }

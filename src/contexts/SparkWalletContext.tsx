@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react";
 import { SparkWallet, TokenBalanceMap } from "@buildonspark/spark-sdk";
@@ -27,19 +28,39 @@ import type {
   TokenTransactionWithStatus,
 } from "@/types/spark-wallet";
 import { ExitSpeed, type CoopExitFeeQuote } from "@buildonspark/spark-sdk/types";
+import {
+  saveTransfers,
+  loadTransfers,
+  saveLightningInvoices,
+  loadLightningInvoices,
+  saveLightningSendRequests,
+  loadLightningSendRequests,
+  saveDepositAddresses,
+  loadDepositAddresses,
+  clearAllActivityData,
+  isLocalStorageAvailable,
+} from "@/utils/activityPersistence";
 
-const initialState: WalletState = {
-  wallet: null as SparkWallet | null,
-  isInitialized: false,
-  isLoading: false,
-  error: null,
-  sparkAddress: null,
-  balance: null,
-  transfers: [],
-  lightningInvoices: [],
-  lightningSendRequests: [],
-  depositAddresses: [],
-  tokenInfo: [],
+const getInitialState = (): WalletState => {
+  // Load persisted data if available
+  const persistedTransfers = isLocalStorageAvailable() ? loadTransfers() : [];
+  const persistedLightningInvoices = isLocalStorageAvailable() ? loadLightningInvoices() : [];
+  const persistedLightningSendRequests = isLocalStorageAvailable() ? loadLightningSendRequests() : [];
+  const persistedDepositAddresses = isLocalStorageAvailable() ? loadDepositAddresses() : [];
+
+  return {
+    wallet: null as SparkWallet | null,
+    isInitialized: false,
+    isLoading: false,
+    error: null,
+    sparkAddress: null,
+    balance: null,
+    transfers: persistedTransfers,
+    lightningInvoices: persistedLightningInvoices,
+    lightningSendRequests: persistedLightningSendRequests,
+    depositAddresses: persistedDepositAddresses,
+    tokenInfo: [],
+  };
 };
 
 const SparkWalletContext = createContext<WalletContextType | undefined>(
@@ -78,7 +99,35 @@ interface SparkWalletProviderProps {
 export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
   children,
 }) => {
-  const [state, setState] = useState<WalletState>(initialState);
+  const [state, setState] = useState<WalletState>(getInitialState);
+
+  // Persist transfers whenever they change
+  useEffect(() => {
+    if (isLocalStorageAvailable() && state.transfers.length > 0) {
+      saveTransfers(state.transfers);
+    }
+  }, [state.transfers]);
+
+  // Persist lightning invoices whenever they change
+  useEffect(() => {
+    if (isLocalStorageAvailable() && state.lightningInvoices.length > 0) {
+      saveLightningInvoices(state.lightningInvoices);
+    }
+  }, [state.lightningInvoices]);
+
+  // Persist lightning send requests whenever they change
+  useEffect(() => {
+    if (isLocalStorageAvailable() && state.lightningSendRequests.length > 0) {
+      saveLightningSendRequests(state.lightningSendRequests);
+    }
+  }, [state.lightningSendRequests]);
+
+  // Persist deposit addresses whenever they change
+  useEffect(() => {
+    if (isLocalStorageAvailable() && state.depositAddresses.length > 0) {
+      saveDepositAddresses(state.depositAddresses);
+    }
+  }, [state.depositAddresses]);
 
   const setLoading = (isLoading: boolean) => {
     setState((prev) => ({ ...prev, isLoading }));
@@ -216,10 +265,17 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           txId: result.id,
         };
 
-        setState((prev) => ({
-          ...prev,
-          transfers: [transfer, ...prev.transfers],
-        }));
+        setState((prev) => {
+          const updatedTransfers = [transfer, ...prev.transfers];
+          // Save to localStorage immediately
+          if (isLocalStorageAvailable()) {
+            saveTransfers(updatedTransfers);
+          }
+          return {
+            ...prev,
+            transfers: updatedTransfers,
+          };
+        });
 
         // Refresh balance after transfer
         await getBalance();
@@ -252,7 +308,13 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           txId: t.id,
         }));
 
-        setState((prev) => ({ ...prev, transfers }));
+        setState((prev) => {
+          // Save to localStorage
+          if (isLocalStorageAvailable()) {
+            saveTransfers(transfers);
+          }
+          return { ...prev, transfers };
+        });
       } catch (error) {
         setError(
           error instanceof Error ? error.message : "Failed to get transfers"
@@ -287,10 +349,17 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           createdAt: Date.now().toString(),
         };
 
-        setState((prev) => ({
-          ...prev,
-          lightningInvoices: [invoice, ...prev.lightningInvoices],
-        }));
+        setState((prev) => {
+          const updatedInvoices = [invoice, ...prev.lightningInvoices];
+          // Save to localStorage immediately
+          if (isLocalStorageAvailable()) {
+            saveLightningInvoices(updatedInvoices);
+          }
+          return {
+            ...prev,
+            lightningInvoices: updatedInvoices,
+          };
+        });
 
         setLoading(false);
         return invoice;
@@ -331,10 +400,17 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           status: result.status === 'TRANSFER_STATUS_COMPLETED' ? 'completed' : 'failed',
         };
 
-        setState((prev) => ({
-          ...prev,
-          lightningSendRequests: [sendRequest, ...prev.lightningSendRequests],
-        }));
+        setState((prev) => {
+          const updatedRequests = [sendRequest, ...prev.lightningSendRequests];
+          // Save to localStorage immediately
+          if (isLocalStorageAvailable()) {
+            saveLightningSendRequests(updatedRequests);
+          }
+          return {
+            ...prev,
+            lightningSendRequests: updatedRequests,
+          };
+        });
 
         // Refresh balance after payment
         await getBalance();
@@ -419,10 +495,17 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         throw new Error("Wallet not initialized");
       }
       const address = await state.wallet.getSingleUseDepositAddress();
-      setState((prev) => ({
-        ...prev,
-        depositAddresses: [...prev.depositAddresses, address],
-      }));
+      setState((prev) => {
+        const updatedAddresses = [...prev.depositAddresses, address];
+        // Save to localStorage immediately
+        if (isLocalStorageAvailable()) {
+          saveDepositAddresses(updatedAddresses);
+        }
+        return {
+          ...prev,
+          depositAddresses: updatedAddresses,
+        };
+      });
       return address;
     } catch (error) {
       setError(
@@ -438,7 +521,13 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         throw new Error("Wallet not initialized");
       }
       const addresses = await state.wallet.getUnusedDepositAddresses();
-      setState((prev) => ({ ...prev, depositAddresses: addresses }));
+      setState((prev) => {
+        // Save to localStorage
+        if (isLocalStorageAvailable()) {
+          saveDepositAddresses(addresses);
+        }
+        return { ...prev, depositAddresses: addresses };
+      });
       return addresses;
     } catch (error) {
       setError(
@@ -956,12 +1045,34 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         throw new Error("Wallet not initialized");
       }
       await state.wallet.cleanupConnections();
+      
+      // Optionally clear persisted data on disconnect
+      // Uncomment the line below if you want to clear data on disconnect
+      // if (isLocalStorageAvailable()) {
+      //   clearAllActivityData();
+      // }
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Failed to cleanup connections"
       );
     }
   }, [state.wallet]);
+
+  const clearActivityHistory = useCallback((): void => {
+    // Clear from state
+    setState((prev) => ({
+      ...prev,
+      transfers: [],
+      lightningInvoices: [],
+      lightningSendRequests: [],
+      depositAddresses: [],
+    }));
+    
+    // Clear from localStorage
+    if (isLocalStorageAvailable()) {
+      clearAllActivityData();
+    }
+  }, []);
 
   const value: WalletContextType = {
     ...state,
@@ -994,6 +1105,7 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
     getSwapFeeEstimate,
     cleanupConnections,
     clearError,
+    clearActivityHistory,
   };
 
   return (
