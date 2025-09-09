@@ -32,9 +32,17 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # vercel
 .vercel
+.env.vercel
+
+# certificates and keys
+*.key
+*.crt
+ec_key.pem
+ec_crt.crt
 
 # typescript
 *.tsbuildinfo
