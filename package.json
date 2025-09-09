@@ -10,9 +10,12 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@buildonspark/spark-sdk": "^0.2.13",
+    "@lightsparkdev/wallet-sdk": "^0.13.3",
+    "eventemitter3": "^5.0.1",
+    "next": "15.5.2",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.5.2"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
     "typescript": "^5",
