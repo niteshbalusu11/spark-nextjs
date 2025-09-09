@@ -180,24 +180,24 @@ const RecentActivity: React.FC = () => {
       {transfers.length > 0 ? (
         <div className="space-y-3">
           {transfers.slice(0, 5).map((transfer) => (
-            <div key={transfer.id} className="flex justify-between items-center p-3 bg-gray-900/50 border border-gray-800 rounded-lg">
-              <div className="flex items-center space-x-3">
+            <div key={transfer.id} className="flex justify-between items-center p-3 bg-gray-900/50 border border-gray-800 rounded-lg gap-3">
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
                 <div className={`w-2 h-2 rounded-full ${
                   transfer.status === 'completed' ? 'bg-green-400' :
                   transfer.status === 'pending' ? 'bg-yellow-400' :
                   'bg-red-400'
                 }`} />
-                <div>
-                  <p className="text-sm font-medium text-gray-200">
-                    Transfer to {transfer.receiverSparkAddress}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-200 truncate">
+                    Transfer to {transfer.receiverSparkAddress.slice(0, 20)}...
                   </p>
                   <p className="text-xs text-gray-500">
-                    {new Date(transfer.timestamp).toLocaleString()}
+                    {transfer.timestamp}
                   </p>
                 </div>
               </div>
-              <span className="text-sm font-bold text-gray-100">
-                {Number(transfer.amount) / 100000000} BTC
+              <span className="text-sm font-bold text-gray-100 whitespace-nowrap">
+                {(Number(transfer.amount) / 100000000).toFixed(8)} BTC
               </span>
             </div>
           ))}
