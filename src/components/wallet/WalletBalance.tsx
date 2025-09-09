@@ -8,13 +8,13 @@ export const WalletBalance: React.FC = () => {
   const { formatSats } = useFormatters();
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-6">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold text-gray-800">Wallet Balance</h3>
+        <h3 className="text-xl font-bold text-gray-100">Wallet Balance</h3>
         <button
           onClick={refreshBalance}
           disabled={isRefreshing}
-          className="text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-blue-400 hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isRefreshing ? (
             <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -30,22 +30,22 @@ export const WalletBalance: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-700 rounded-lg p-6 text-white">
           <p className="text-sm opacity-90 mb-1">Bitcoin Balance</p>
           <p className="text-3xl font-bold">{balanceInBTC} BTC</p>
           <p className="text-sm opacity-90 mt-2">{formatSats(balanceInSats)} sats</p>
         </div>
 
         {tokenBalances && tokenBalances.size > 0 && (
-          <div className="border-t pt-4">
-            <h4 className="text-sm font-semibold text-gray-600 mb-3">Token Balances</h4>
+          <div className="border-t border-gray-700 pt-4">
+            <h4 className="text-sm font-semibold text-gray-400 mb-3">Token Balances</h4>
             <div className="space-y-2">
               {Array.from(tokenBalances.entries()).map(([tokenId, balance]) => (
-                <div key={tokenId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700 truncate max-w-[200px]">
+                <div key={tokenId} className="flex justify-between items-center p-3 bg-gray-900/50 border border-gray-800 rounded-lg">
+                  <span className="text-sm font-medium text-gray-300 truncate max-w-[200px]">
                     {tokenId}
                   </span>
-                  <span className="text-sm font-bold text-gray-900">
+                  <span className="text-sm font-bold text-gray-100">
                     {balance.toString()}
                   </span>
                 </div>

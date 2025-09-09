@@ -1,6 +1,7 @@
 // Spark Wallet Types and Interfaces
 
 import { SparkWallet } from '@buildonspark/spark-sdk';
+import { LightningSendRequestStatus } from '@buildonspark/spark-sdk/types';
 
 export interface SparkWalletProps {
   mnemonicOrSeed?: string;
@@ -49,11 +50,9 @@ export interface LightningReceiveRequest {
 export interface LightningSendRequest {
   id: string;
   invoice: string;
-  amountSats: number;
   maxFeeSats?: number;
   preferSpark?: boolean;
   status: 'pending' | 'completed' | 'failed';
-  createdAt: number;
 }
 
 export interface PayLightningInvoiceParams {
@@ -154,7 +153,6 @@ export interface WalletContextType extends WalletState {
   createLightningInvoice: (params: CreateLightningInvoiceParams) => Promise<LightningReceiveRequest | null>;
   payLightningInvoice: (params: PayLightningInvoiceParams) => Promise<LightningSendRequest | null>;
   getLightningReceiveRequest: (id: string) => Promise<LightningReceiveRequest | null>;
-  getLightningSendRequest: (id: string) => Promise<LightningSendRequest | null>;
   getLightningSendFeeEstimate: (encodedInvoice: string) => Promise<number | null>;
   
   // Deposits

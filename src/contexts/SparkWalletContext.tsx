@@ -209,7 +209,7 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           receiverSparkAddress,
           timestamp: Date.now(),
           status: "completed",
-          txId: (result as any).transactionId || undefined,
+          txId: result.id,
         };
 
         setState((prev) => ({
@@ -269,12 +269,11 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         setLoading(true);
         const result = await state.wallet.createLightningInvoice(params);
 
+        console.log('Created invoice:', result);
+
         const invoice: LightningReceiveRequest = {
           id: result.id || crypto.randomUUID(),
-          invoice:
-            typeof result.invoice === "string"
-              ? result.invoice
-              : result.invoice.toString(),
+          invoice: result.invoice.encodedInvoice,
           amountSats: params.amountSats,
           memo: params.memo,
           expirySeconds: params.expirySeconds?.toString(),
@@ -323,11 +322,9 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         const sendRequest: LightningSendRequest = {
           id: result.id,
           invoice: params.invoice,
-          amountSats: params.amountSatsToSend || 0,
           maxFeeSats: params.maxFeeSats,
           preferSpark: params.preferSpark,
-          status: "completed",
-          createdAt: Date.now(),
+          status: result.status === 'TRANSFER_STATUS_COMPLETED' ? 'completed' : 'failed',
         };
 
         setState((prev) => ({
@@ -386,40 +383,7 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
     [state.wallet]
   );
 
-  const getLightningSendRequest = useCallback(
-    async (id: string): Promise<LightningSendRequest | null> => {
-      try {
-        if (!state.wallet) {
-          throw new Error("Wallet not initialized");
-        }
-        const result = await state.wallet.getLightningSendRequest(id);
-        if (!result) return null;
 
-        // Convert SDK response to our type
-        const request: LightningSendRequest = {
-          id: (result as any).id || id,
-          invoice: (result as any).invoice || "",
-          amountSats: (result as any).amount || 0,
-          maxFeeSats: (result as any).maxFeeSats,
-          preferSpark: (result as any).preferSpark,
-          status: "pending",
-          createdAt:
-            typeof (result as any).createdAt === "string"
-              ? Date.parse((result as any).createdAt)
-              : (result as any).createdAt || Date.now(),
-        };
-        return request;
-      } catch (error) {
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to get Lightning send request"
-        );
-        return null;
-      }
-    },
-    [state.wallet]
-  );
 
   const getLightningSendFeeEstimate = useCallback(
     async (encodedInvoice: string): Promise<number | null> => {
@@ -956,7 +920,6 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
     createLightningInvoice,
     payLightningInvoice,
     getLightningReceiveRequest,
-    getLightningSendRequest,
     getLightningSendFeeEstimate,
     getSingleUseDepositAddress,
     getUnusedDepositAddresses,

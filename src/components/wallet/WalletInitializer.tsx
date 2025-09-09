@@ -50,17 +50,17 @@ export const WalletInitializer: React.FC = () => {
   if (isInitialized) {
     const storedMnemonic = localStorage.getItem('spark_wallet_mnemonic');
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <p className="text-green-800 font-medium mb-2">✓ Wallet initialized successfully</p>
+      <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
+        <p className="text-green-400 font-medium mb-2">✓ Wallet initialized successfully</p>
         {storedMnemonic && (
           <div className="mt-3 space-y-2">
             <details className="cursor-pointer">
-              <summary className="text-sm text-green-700 hover:text-green-800">View Seed Phrase</summary>
-              <div className="mt-2 p-3 bg-white rounded border border-green-200">
-                <p className="font-mono text-xs text-gray-700 break-all">{storedMnemonic}</p>
+              <summary className="text-sm text-green-500 hover:text-green-400">View Seed Phrase</summary>
+              <div className="mt-2 p-3 bg-gray-900/50 rounded border border-green-800/30">
+                <p className="font-mono text-xs text-gray-300 break-all">{storedMnemonic}</p>
                 <button
                   onClick={() => copyToClipboard(storedMnemonic)}
-                  className="mt-2 text-xs text-green-600 hover:text-green-700"
+                  className="mt-2 text-xs text-green-400 hover:text-green-300"
                 >
                   {copied ? '✓ Copied!' : 'Copy Seed Phrase'}
                 </button>
@@ -68,7 +68,7 @@ export const WalletInitializer: React.FC = () => {
             </details>
             <button
               onClick={handleClearWallet}
-              className="text-xs text-red-600 hover:text-red-700"
+              className="text-xs text-red-400 hover:text-red-300"
             >
               Clear Wallet & Start Over
             </button>
@@ -79,12 +79,12 @@ export const WalletInitializer: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Initialize Spark Wallet</h2>
+    <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-6 max-w-2xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6 text-gray-100">Initialize Spark Wallet</h2>
       
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-900/20 border border-red-800/50 rounded-lg p-4 mb-4">
+          <p className="text-red-400">{error}</p>
         </div>
       )}
 
@@ -100,7 +100,7 @@ export const WalletInitializer: React.FC = () => {
           <button
             onClick={() => setMode('restore')}
             disabled={isLoading}
-            className="w-full bg-gray-600 text-white py-3 px-6 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full bg-gray-700 text-white py-3 px-6 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Restore Existing Wallet
           </button>
@@ -109,11 +109,11 @@ export const WalletInitializer: React.FC = () => {
 
       {mode === 'new' && !showMnemonic && (
         <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-blue-800 mb-2">
+          <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+            <p className="text-blue-400 mb-2">
               This will generate a new wallet with an auto-generated seed phrase.
             </p>
-            <p className="text-blue-700 text-sm">
+            <p className="text-blue-500 text-sm">
               The seed phrase will be displayed and stored securely in your browser.
             </p>
           </div>
@@ -128,7 +128,7 @@ export const WalletInitializer: React.FC = () => {
             <button
               onClick={() => setMode(null)}
               disabled={isLoading}
-              className="flex-1 bg-gray-400 text-white py-3 px-6 rounded-lg hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 bg-gray-700 text-white py-3 px-6 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Cancel
             </button>
@@ -138,14 +138,14 @@ export const WalletInitializer: React.FC = () => {
 
       {showMnemonic && generatedMnemonic && (
         <div className="space-y-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-yellow-800 font-bold mb-2">⚠️ Important: Save Your Seed Phrase</p>
-            <p className="text-yellow-700 text-sm">
+          <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-4">
+            <p className="text-yellow-400 font-bold mb-2">⚠️ Important: Save Your Seed Phrase</p>
+            <p className="text-yellow-500 text-sm">
               This seed phrase is stored in your browser's local storage. Write it down and keep it safe!
             </p>
           </div>
-          <div className="bg-gray-100 rounded-lg p-4">
-            <p className="font-mono text-sm text-gray-800 break-all leading-relaxed">
+          <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4">
+            <p className="font-mono text-sm text-gray-300 break-all leading-relaxed">
               {generatedMnemonic}
             </p>
           </div>
@@ -172,7 +172,7 @@ export const WalletInitializer: React.FC = () => {
       {mode === 'restore' && (
         <div className="space-y-4">
           <div>
-            <label htmlFor="mnemonic" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="mnemonic" className="block text-sm font-medium text-gray-300 mb-2">
               Enter your seed phrase
             </label>
             <textarea
@@ -180,7 +180,7 @@ export const WalletInitializer: React.FC = () => {
               value={mnemonic}
               onChange={(e) => setMnemonic(e.target.value)}
               placeholder="Enter your 12 or 24 word seed phrase..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-100 placeholder-gray-500"
               rows={4}
             />
           </div>
@@ -198,7 +198,7 @@ export const WalletInitializer: React.FC = () => {
                 setMnemonic('');
               }}
               disabled={isLoading}
-              className="flex-1 bg-gray-400 text-white py-3 px-6 rounded-lg hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 bg-gray-700 text-white py-3 px-6 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Cancel
             </button>
