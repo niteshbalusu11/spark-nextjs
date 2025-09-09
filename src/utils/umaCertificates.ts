@@ -13,8 +13,8 @@ export function loadUMACertificates() {
     if (process.env.UMA_CERTIFICATE && process.env.UMA_PRIVATE_KEY) {
       console.log('Loading UMA certificates from environment variables');
       return {
-        certificate: process.env.UMA_CERTIFICATE,
-        privateKey: process.env.UMA_PRIVATE_KEY,
+        certificate: process.env.UMA_CERTIFICATE.replace(/\\n/g, '\n'),
+        privateKey: process.env.UMA_PRIVATE_KEY.replace(/\\n/g, '\n'),
       };
     }
     
@@ -86,34 +86,25 @@ export function extractPrivateKeyHex(pemKey: string): string {
   try {
     // Handle single-line format from env variables
     const normalizedPem = singleLineToPem(pemKey);
-    
-    // Remove PEM headers and decode base64
-    const lines = normalizedPem.split('\n');
-    const keyData = lines
-      .filter(line => !line.includes('-----') && line.trim())
-      .join('');
-    
-    // For EC keys, we need to extract the actual private key portion
-    const keyBuffer = Buffer.from(keyData, 'base64');
-    
-    // Parse the DER structure to extract the private key
-    const keyHex = keyBuffer.toString('hex');
-    
-    // For secp256k1 keys, the private key is typically 32 bytes
-    // Look for the private key in the DER structure
-    const privateKeyMatch = keyHex.match(/(?:30740201010420)([a-f0-9]{64})/i);
-    
-    if (privateKeyMatch && privateKeyMatch[1]) {
-      return privateKeyMatch[1];
+
+    // Use crypto library to parse the key
+    const privateKey = crypto.createPrivateKey({
+      key: normalizedPem,
+      format: 'pem',
+    });
+
+    // Export the key in JWK format to easily access the private key component 'd'
+    const jwk = privateKey.export({ format: 'jwk' });
+
+    if (!jwk.d) {
+      throw new Error('Could not extract private key component from JWK.');
     }
+
+    // The 'd' component is the private key, Base64URL encoded.
+    // Decode it to a buffer and then convert to hex.
+    const privateKeyBuffer = Buffer.from(jwk.d, 'base64url');
     
-    // Fallback: try to find any 32-byte sequence that could be the key
-    const possibleKey = keyHex.match(/([a-f0-9]{64})/i);
-    if (possibleKey) {
-      return possibleKey[1];
-    }
-    
-    throw new Error('Could not extract private key from PEM');
+    return privateKeyBuffer.toString('hex');
   } catch (error) {
     console.error('Failed to extract private key:', error);
     throw error;

@@ -84,7 +84,10 @@ interface UMAContextType extends UMAState {
   
   // UMA Protocol Operations
   resolveLNURLPAddress: (umaAddress: string) => Promise<LNURLPResponse | null>;
-  createPayRequest: (params: PayRequest) => Promise<PayReqResponse | null>;
+  createPayRequest: (
+    params: PayRequest,
+    callback: string,
+  ) => Promise<PayReqResponse | null>;
   sendPayment: (invoice: string, amount: number) => Promise<UMATransaction | null>;
   
   // Utility
@@ -399,31 +402,37 @@ export const UMAProvider: React.FC<UMAProviderProps> = ({ children }) => {
         } : null,
       }));
 
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const lnurlpResponse = await resolveLNURLPAddress(state.sendPaymentFlow.recipient.umaAddress);
+      if (!lnurlpResponse) {
+        throw new Error('Failed to resolve LNURLP address');
+      }
 
-      const transaction: UMATransaction = {
-        id: crypto.randomUUID(),
-        type: 'send',
-        umaAddress: state.sendPaymentFlow.recipient.umaAddress,
-        amount: state.sendPaymentFlow.amount,
-        currency: state.sendPaymentFlow.currency || 'USD',
-        convertedAmount: state.sendPaymentFlow.receivingAmount,
-        convertedCurrency: state.sendPaymentFlow.receivingCurrency,
-        exchangeRate: state.sendPaymentFlow.exchangeRate,
-        status: 'completed',
-        timestamp: new Date().toISOString(),
-        fees: state.sendPaymentFlow.fees?.total,
-      };
+      const payRequest = await createPayRequest(
+        {
+          amount: state.sendPaymentFlow.amount,
+          currency: state.sendPaymentFlow.currency || 'USD',
+          payerIdentifier: state.account?.address || '',
+          payerKycStatus: 'VERIFIED', // Assuming verified for this example
+        },
+        lnurlpResponse.callback,
+      );
 
-      await addTransaction(transaction);
+      if (!payRequest) {
+        throw new Error('Failed to create pay request');
+      }
+
+      const paymentResult = await sendPayment(payRequest.pr, state.sendPaymentFlow.amount);
+
+      if (!paymentResult) {
+        throw new Error('Payment failed');
+      }
 
       setState(prev => ({
         ...prev,
         sendPaymentFlow: prev.sendPaymentFlow ? {
           ...prev.sendPaymentFlow,
           step: 'complete',
-          transactionId: transaction.id,
+          transactionId: paymentResult.id,
         } : null,
       }));
 
@@ -435,7 +444,7 @@ export const UMAProvider: React.FC<UMAProviderProps> = ({ children }) => {
       setError(error instanceof Error ? error.message : 'Payment failed');
       setLoading(false);
     }
-  }, [state.sendPaymentFlow, addTransaction, refreshBalance]);
+  }, [state.sendPaymentFlow, state.account, addTransaction, refreshBalance]);
 
   const cancelPayment = useCallback(() => {
     setState(prev => ({ ...prev, sendPaymentFlow: null }));
@@ -444,67 +453,92 @@ export const UMAProvider: React.FC<UMAProviderProps> = ({ children }) => {
   // UMA Protocol Operations (Mock implementations)
   const resolveLNURLPAddress = useCallback(async (umaAddress: string): Promise<LNURLPResponse | null> => {
     try {
-      // Mock LNURLP response
       await logActivity({
         id: crypto.randomUUID(),
         type: 'lnurlp_request',
         timestamp: new Date().toISOString(),
         details: { umaAddress },
+        status: 'pending',
+      });
+
+      const response = await fetch(`/api/uma/lnurlp?receiver=${umaAddress}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch LNURLP data');
+      }
+      const data = await response.json();
+
+      await logActivity({
+        id: crypto.randomUUID(),
+        type: 'lnurlp_response',
+        timestamp: new Date().toISOString(),
+        details: data,
         status: 'success',
       });
 
-      return {
-        callback: `https://api.example.com/lnurlp/${umaAddress}`,
-        maxSendable: 100000000,
-        minSendable: 1000,
-        metadata: JSON.stringify([['text/plain', 'Payment to ' + umaAddress]]),
-        tag: 'payRequest',
-        currencies: [
-          {
-            code: 'USD',
-            name: 'US Dollar',
-            symbol: '$',
-            multiplier: 100,
-            decimals: 2,
-          },
-        ],
-        umaVersion: '1.0',
-      };
+      return data;
     } catch (error) {
       console.error('Failed to resolve LNURLP address:', error);
+      setError(error instanceof Error ? error.message : 'Failed to resolve LNURLP address');
       return null;
     }
   }, [logActivity]);
 
-  const createPayRequest = useCallback(async (params: PayRequest): Promise<PayReqResponse | null> => {
-    try {
-      // Mock pay request response
+  const createPayRequest = useCallback(
+    async (params: PayRequest, callback: string): Promise<PayReqResponse | null> => {
+      try {
+        await logActivity({
+          id: crypto.randomUUID(),
+          type: 'pay_request',
+          timestamp: new Date().toISOString(),
+          details: params,
+          status: 'pending',
+        });
+
+        const response = await fetch(callback, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(params),
+        });
+
+      if (!response.ok) {
+        throw new Error('Failed to create pay request');
+      }
+      const data = await response.json();
+
       await logActivity({
         id: crypto.randomUUID(),
-        type: 'pay_request',
+        type: 'pay_response',
         timestamp: new Date().toISOString(),
-        details: params,
+        details: data,
         status: 'success',
       });
 
-      return {
-        pr: 'lnbc1000n1p...', // Mock lightning invoice
-        routes: [],
-        paymentInfo: {
-          currencyCode: params.currency,
-          decimals: 2,
-          multiplier: 100,
-        },
-      };
+      return data;
     } catch (error) {
       console.error('Failed to create pay request:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create pay request');
       return null;
     }
   }, [logActivity]);
 
   const sendPayment = useCallback(async (invoice: string, amount: number): Promise<UMATransaction | null> => {
     try {
-      // Mock payment sending
+      // This would call the Lightspark client to pay the invoice.
+      // Since we're in the browser, we'll simulate this.
+      // In a real app, you might have a backend endpoint that does this.
+      await logActivity({
+        id: crypto.randomUUID(),
+        type: 'payment_sent',
+        timestamp: new Date().toISOString(),
+        details: { invoice, amount },
+        status: 'pending',
+      });
+
+      // Simulate a delay for payment.
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       const transaction: UMATransaction = {
         id: crypto.randomUUID(),
         type: 'send',
@@ -522,13 +556,14 @@ export const UMAProvider: React.FC<UMAProviderProps> = ({ children }) => {
         id: crypto.randomUUID(),
         type: 'payment_sent',
         timestamp: new Date().toISOString(),
-        details: { invoice, amount },
+        details: { transactionId: transaction.id },
         status: 'success',
       });
 
       return transaction;
     } catch (error) {
       console.error('Failed to send payment:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send payment');
       return null;
     }
   }, [state.sendPaymentFlow, addTransaction, logActivity]);

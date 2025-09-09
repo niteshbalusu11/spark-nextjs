@@ -36,9 +36,82 @@ const getLightsparkClient = () => {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const url = new URL(request.url);
+    const isUmaRequest = uma.isUmaLnurlpQuery(url);
+
+    if (isUmaRequest) {
+      const { umaKeys, umaSigner } = initializeUMAKeys();
+      if (!umaKeys || !umaSigner) {
+        throw new Error('UMA certificates not loaded');
+      }
+
+      const umaRequest = uma.parseLnurlpRequest(url);
+      const client = getLightsparkClient();
+
+      // In a real application, you'd fetch the public keys from the sender's VASP.
+      // For this example, we'll assume a mock implementation or a known key.
+      // const senderPublicKeys = await uma.fetchPublicKeyForVasp({
+      //   vaspDomain: umaRequest.vaspDomain,
+      //   cache: new Map(), // In production, use a persistent cache
+      // });
+
+      // In a real application, you would verify the signature.
+      // const isValid = await uma.verifyUmaLnurlpRequestSignature({
+      //   request: umaRequest,
+      //   vaspPublicKeys: senderPublicKeys,
+      //   nonceCache: new Map(), // In production, use a persistent cache
+      // });
+      // if (!isValid) {
+      //   return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      // }
+
+      const metadata = JSON.stringify([
+        ['text/plain', `Payment to ${umaRequest.receiverAddress}`],
+        ['text/identifier', umaRequest.receiverAddress],
+      ]);
+
+      const response = await uma.getLnurlpResponse({
+        request: umaRequest,
+        privateKeyBytes: Buffer.from(extractPrivateKeyHex(umaKeys.privateKey), 'hex'),
+        requiresTravelRuleInfo: true,
+        callback: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/uma/payreq`,
+        encodedMetadata: metadata,
+        minSendableSats: 1,
+        maxSendableSats: 10000000,
+        payerDataOptions: {
+          name: { mandatory: false },
+          email: { mandatory: false },
+          identifier: { mandatory: true },
+          compliance: { mandatory: true },
+        },
+        currencyOptions: [
+          new uma.Currency(
+            'USD',
+            'US Dollar',
+            '$',
+            2,
+            100,
+            1000000,
+            100,
+          ),
+          new uma.Currency(
+            'BTC',
+            'Bitcoin',
+            '₿',
+            8,
+            1000,
+            100000000000,
+            100000000,
+          ),
+        ],
+        nostrPubkey: process.env.UMA_NOSTR_PUBKEY,
+      });
+
+      return NextResponse.json(response.toJsonSchemaObject());
+    }
+
+    // Fallback for standard LNURLP requests
     const receiverAddress = searchParams.get('receiver');
-    const isUmaRequest = searchParams.get('signature') !== null;
-    
     if (!receiverAddress) {
       return NextResponse.json(
         { error: 'Receiver address is required' },
@@ -46,12 +119,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse the UMA address
-    const [username, domain] = receiverAddress.replace('$', '').split('@');
-    
-    // Check if this is a valid user (in production, check your database)
-    // For now, we'll accept any username for testing
-    
     const response: any = {
       callback: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/uma/payreq`,
       minSendable: 1000, // 1 sat minimum
@@ -63,72 +130,9 @@ export async function GET(request: NextRequest) {
       tag: 'payRequest',
     };
 
-    // Add UMA-specific fields if this is a UMA request
-    if (isUmaRequest) {
-      response.currencies = [
-        {
-          code: 'USD',
-          name: 'US Dollar',
-          symbol: '$',
-          multiplier: 100,
-          decimals: 2,
-          minSendable: 100, // $1.00 minimum
-          maxSendable: 1000000, // $10,000 maximum
-        },
-        {
-          code: 'BTC',
-          name: 'Bitcoin',
-          symbol: '₿',
-          multiplier: 100000000,
-          decimals: 8,
-          minSendable: 1000,
-          maxSendable: 100000000000,
-        },
-      ];
-      response.umaVersion = '1.0';
-      response.commentAllowed = 255;
-      response.nostrPubkey = process.env.UMA_NOSTR_PUBKEY;
-      response.allowsNostr = true;
-      
-      // Add compliance requirements
-      response.payerData = {
-        name: { mandatory: false },
-        email: { mandatory: false },
-        identifier: { mandatory: true },
-        compliance: { mandatory: true },
-      };
-    }
-
     return NextResponse.json(response);
   } catch (error) {
     console.error('LNURLP error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST handler for LNURLP responses
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    
-    // Verify the signature if this is a UMA request
-    if (body.signature) {
-      // In production, verify the signature using the sender's public key
-      // For now, we'll skip verification for testing
-    }
-    
-    // Process the LNURLP response
-    const response = {
-      status: 'success',
-      message: 'LNURLP response processed',
-    };
-    
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error('LNURLP POST error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
