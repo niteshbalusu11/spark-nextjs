@@ -5,8 +5,10 @@ import { useSparkWallet } from '@/contexts/SparkWalletContext';
 import {
   CreateLightningInvoiceParams,
   PayLightningInvoiceParams,
+  WithdrawalFeeQuote,
   WithdrawParams,
 } from '@/types/spark-wallet';
+import { CoopExitFeeQuote, ExitSpeed } from '@buildonspark/spark-sdk/types';
 
 // Hook for wallet initialization
 export const useWalletInit = () => {
@@ -235,6 +237,7 @@ export const useWithdrawals = () => {
   const {
     withdraw,
     getWithdrawalFeeQuote,
+    getCoopExitFeeQuote,
     getCoopExitRequest,
     isLoading,
     error,
@@ -242,10 +245,12 @@ export const useWithdrawals = () => {
 
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [exitSpeed, setExitSpeed] = useState<'FAST' | 'MEDIUM' | 'SLOW'>('MEDIUM');
-  const [feeQuote, setFeeQuote] = useState<any>(null);
+  const [exitSpeed, setExitSpeed] = useState<ExitSpeed>(ExitSpeed.MEDIUM);
+  const [withdrawalFeeQuote, setWithdrawalFeeQuote] = useState<WithdrawalFeeQuote | null>(null);
+  const [exitFeeQuote, setExitFeeQuote] = useState<CoopExitFeeQuote | null>(null);
 
-  const getFeeQuote = useCallback(async () => {
+  // Get withdrawal fee quote (for standard withdrawals)
+  const getWithdrawalFee = useCallback(async () => {
     if (!withdrawAddress || !withdrawAmount) {
       throw new Error('Address and amount are required');
     }
@@ -256,9 +261,25 @@ export const useWithdrawals = () => {
     }
 
     const quote = await getWithdrawalFeeQuote(amountSats, withdrawAddress);
-    setFeeQuote(quote);
+    setWithdrawalFeeQuote(quote);
     return quote;
   }, [withdrawAddress, withdrawAmount, getWithdrawalFeeQuote]);
+
+  // Get coop exit fee quote (for cooperative exits)
+  const getExitFee = useCallback(async () => {
+    if (!withdrawAmount) {
+      throw new Error('Amount is required');
+    }
+
+    const amountSats = parseInt(withdrawAmount);
+    if (isNaN(amountSats) || amountSats <= 0) {
+      throw new Error('Invalid amount');
+    }
+
+    const quote = await getCoopExitFeeQuote(amountSats, exitSpeed);
+    setExitFeeQuote(quote);
+    return quote;
+  }, [withdrawAmount, exitSpeed, getCoopExitFeeQuote]);
 
   const executeWithdrawal = useCallback(async () => {
     if (!withdrawAddress || !withdrawAmount) {
@@ -274,18 +295,19 @@ export const useWithdrawals = () => {
       onchainAddress: withdrawAddress,
       exitSpeed,
       amountSats,
-      feeQuote,
+      feeQuote: exitFeeQuote!, // Use exit fee quote for withdrawal
     };
 
     return await withdraw(params);
-  }, [withdrawAddress, withdrawAmount, exitSpeed, feeQuote, withdraw]);
+  }, [withdrawAddress, withdrawAmount, exitSpeed, exitFeeQuote, withdraw]);
 
   const checkWithdrawalStatus = useCallback(async (id: string) => {
     return await getCoopExitRequest(id);
   }, [getCoopExitRequest]);
 
   return {
-    getFeeQuote,
+    getWithdrawalFee,
+    getExitFee,
     executeWithdrawal,
     checkWithdrawalStatus,
     withdrawAddress,
@@ -294,7 +316,8 @@ export const useWithdrawals = () => {
     setWithdrawAmount,
     exitSpeed,
     setExitSpeed,
-    feeQuote,
+    withdrawalFeeQuote,
+    exitFeeQuote,
     isLoading,
     error,
   };

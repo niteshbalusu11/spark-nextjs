@@ -1,7 +1,7 @@
 // Spark Wallet Types and Interfaces
 
 import { SparkWallet } from '@buildonspark/spark-sdk';
-import { LightningSendRequestStatus } from '@buildonspark/spark-sdk/types';
+import { CoopExitFeeQuote, ExitSpeed, LightningSendRequestStatus } from '@buildonspark/spark-sdk/types';
 
 export interface SparkWalletProps {
   mnemonicOrSeed?: string;
@@ -21,9 +21,9 @@ export interface ConfigOptions {
 
 export interface WalletTransfer {
   id: string;
-  amount: bigint;
+  amount: number;
   receiverSparkAddress: string;
-  timestamp: number;
+  timestamp: string;
   status: 'pending' | 'completed' | 'failed';
   txId?: string;
 }
@@ -72,28 +72,32 @@ export interface CreateLightningInvoiceParams {
 
 export interface WithdrawParams {
   onchainAddress: string;
-  exitSpeed: 'FAST' | 'MEDIUM' | 'SLOW';
+  exitSpeed: ExitSpeed;
   amountSats?: number;
-  feeQuote?: WithdrawalFeeQuote;
+  feeQuote: CoopExitFeeQuote;
   deductFeeFromWithdrawalAmount?: boolean;
 }
 
+// This is for getting the withdrawal fee estimate (different from exit fee)
 export interface WithdrawalFeeQuote {
   amountSats: number;
   withdrawalAddress: string;
-  exitSpeed: 'FAST' | 'MEDIUM' | 'SLOW';
   feeSats: number;
-  expiresAt: number;
+  expiresAt: string;
 }
+
+// Re-export types properly for TypeScript with isolatedModules
+export type { CoopExitFeeQuote } from '@buildonspark/spark-sdk/types';
+export { ExitSpeed } from '@buildonspark/spark-sdk/types';
 
 export interface CoopExitRequest {
   id: string;
   onchainAddress: string;
   amountSats: number;
-  exitSpeed: 'FAST' | 'MEDIUM' | 'SLOW';
+  exitSpeed: ExitSpeed;
   status: 'pending' | 'completed' | 'failed';
   txId?: string;
-  createdAt: number;
+  createdAt: string;
 }
 
 export interface ClaimStaticDepositOutput {
@@ -167,6 +171,7 @@ export interface WalletContextType extends WalletState {
   // Withdrawals
   withdraw: (params: WithdrawParams) => Promise<CoopExitRequest | null>;
   getWithdrawalFeeQuote: (amountSats: number, withdrawalAddress: string) => Promise<WithdrawalFeeQuote | null>;
+  getCoopExitFeeQuote: (amountSats: number, exitSpeed: ExitSpeed) => Promise<CoopExitFeeQuote | null>;
   getCoopExitRequest: (id: string) => Promise<CoopExitRequest | null>;
   
   // Tokens

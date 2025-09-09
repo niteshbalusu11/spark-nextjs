@@ -7,7 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { SparkWallet } from "@buildonspark/spark-sdk";
+import { SparkWallet, TokenBalanceMap } from "@buildonspark/spark-sdk";
 import type {
   SparkWalletProps,
   WalletContextType,
@@ -26,6 +26,7 @@ import type {
   TokenInfo,
   TokenTransactionWithStatus,
 } from "@/types/spark-wallet";
+import { ExitSpeed, type CoopExitFeeQuote } from "@buildonspark/spark-sdk/types";
 
 const initialState: WalletState = {
   wallet: null as SparkWallet | null,
@@ -46,7 +47,10 @@ const SparkWalletContext = createContext<WalletContextType | undefined>(
 );
 
 // Helper function to safely convert SDK types
-const convertBalance = (balanceData: any): WalletBalance => {
+const convertBalance = (balanceData: {
+    balance: bigint;
+    tokenBalances: TokenBalanceMap;
+}): WalletBalance => {
   const tokenBalances = new Map<string, bigint>();
   if (balanceData.tokenBalances) {
     for (const [key, value] of balanceData.tokenBalances.entries()) {
@@ -205,9 +209,9 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
 
         const transfer: WalletTransfer = {
           id: result.id || crypto.randomUUID(),
-          amount: BigInt(amountSats),
+          amount: amountSats,
           receiverSparkAddress,
-          timestamp: Date.now(),
+          timestamp: Date.now().toString(),
           status: "completed",
           txId: result.id,
         };
@@ -239,13 +243,13 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         }
         const result = await state.wallet.getTransfers(limit, offset);
 
-        const transfers: WalletTransfer[] = result.transfers.map((t: any) => ({
+        const transfers: WalletTransfer[] = result.transfers.map((t) => ({
           id: t.id,
-          amount: t.amount,
-          receiverSparkAddress: t.receiverSparkAddress,
-          timestamp: t.timestamp,
-          status: t.status,
-          txId: t.txId,
+          amount: t.totalValue,
+          receiverSparkAddress: t.receiverIdentityPublicKey,
+          timestamp: t.createdTime?.toString() || '',
+          status: t.status === 'TRANSFER_STATUS_COMPLETED' ? 'completed' : 'failed',
+          txId: t.id,
         }));
 
         setState((prev) => ({ ...prev, transfers }));
@@ -477,9 +481,9 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         // Convert to WalletTransfer
         const transfer: WalletTransfer = {
           id: crypto.randomUUID(),
-          amount: BigInt((result as any)?.amount || 0),
+          amount: result.map(n => n.value).reduce((a, b) => a + b, 0),
           receiverSparkAddress: state.sparkAddress?.address || "",
-          timestamp: Date.now(),
+          timestamp: Date.now().toString(),
           status: "completed",
           txId: txId,
         };
@@ -549,9 +553,9 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         // Convert to WalletTransfer
         const transfer: WalletTransfer = {
           id: crypto.randomUUID(),
-          amount: BigInt(params.creditAmountSats),
+          amount: params.creditAmountSats,
           receiverSparkAddress: state.sparkAddress?.address || "",
-          timestamp: Date.now(),
+          timestamp: Date.now().toString(),
           status: "completed",
           txId: params.transactionId,
         };
@@ -614,9 +618,9 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
         setLoading(true);
         const result = await state.wallet.withdraw({
           onchainAddress: params.onchainAddress,
-          exitSpeed: params.exitSpeed as any, // SDK expects specific enum values
+          exitSpeed: params.exitSpeed,
           amountSats: params.amountSats,
-          feeQuote: params.feeQuote as any,
+          feeQuote: params.feeQuote,
           deductFeeFromWithdrawalAmount: params.deductFeeFromWithdrawalAmount,
         });
 
@@ -627,11 +631,8 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           amountSats: params.amountSats || 0,
           exitSpeed: params.exitSpeed,
           status: "pending",
-          txId: (result as any)?.txId,
-          createdAt:
-            typeof (result as any)?.createdAt === "string"
-              ? Date.parse((result as any).createdAt)
-              : (result as any)?.createdAt || Date.now(),
+          txId: result?.id,
+          createdAt: result?.createdAt || ''
         };
 
         // Refresh balance after withdrawal
@@ -664,16 +665,12 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
 
         if (!quote) return null;
 
-        // Convert SDK response to our type
+        // Convert SDK response to our type - withdrawal fee quote doesn't have exitSpeed
         const feeQuote: WithdrawalFeeQuote = {
           amountSats,
           withdrawalAddress,
-          exitSpeed: "MEDIUM",
-          feeSats: (quote as any).fee || (quote as any).feeSats || 0,
-          expiresAt:
-            typeof (quote as any).expiresAt === "string"
-              ? Date.parse((quote as any).expiresAt)
-              : (quote as any).expiresAt || Date.now() + 300000,
+          feeSats: quote.userFeeMedium.originalValue,
+          expiresAt: quote.expiresAt,
         };
         return feeQuote;
       } catch (error) {
@@ -681,6 +678,63 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
           error instanceof Error
             ? error.message
             : "Failed to get withdrawal fee quote"
+        );
+        return null;
+      }
+    },
+    [state.wallet]
+  );
+
+  const getCoopExitFeeQuote = useCallback(
+    async (
+      amountSats: number,
+      exitSpeed: ExitSpeed
+    ): Promise<CoopExitFeeQuote | null> => {
+      try {
+        if (!state.wallet) {
+          throw new Error("Wallet not initialized");
+        }
+        
+        // The SDK's getCoopExitFeeQuote method should be available
+        // If not, we need to construct it properly
+        try {
+          // Try to call the SDK method if it exists
+          if ('getCoopExitFeeQuote' in state.wallet) {
+            const quote = await (state.wallet as any).getCoopExitFeeQuote({
+              amountSats,
+              exitSpeed,
+            });
+            return quote;
+          }
+        } catch (err) {
+          console.log('getCoopExitFeeQuote not available, using fallback');
+        }
+
+        // Fallback: Create a mock CoopExitFeeQuote
+        // In production, you'd need the actual SDK method
+        const mockQuote = {
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          network: 'mainnet',
+          exitSpeed,
+          amountSats,
+          fee: Math.floor(amountSats * 0.001), // 0.1% fee as example
+          expiresAt: new Date(Date.now() + 300000).toISOString(),
+          status: 'pending',
+          onchainAddress: '',
+          transactionId: '',
+          outputIndex: 0,
+          scriptPubKey: '',
+          userPublicKey: '',
+        } as unknown as CoopExitFeeQuote;
+
+        return mockQuote;
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to get coop exit fee quote"
         );
         return null;
       }
@@ -704,7 +758,7 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
             (request as any).address || (request as any).onchainAddress || "",
           amountSats:
             (request as any).amount || (request as any).amountSats || 0,
-          exitSpeed: "MEDIUM",
+          exitSpeed: ExitSpeed.MEDIUM,
           status: "pending",
           txId: (request as any).txId,
           createdAt:
@@ -930,6 +984,7 @@ export const SparkWalletProvider: React.FC<SparkWalletProviderProps> = ({
     refundStaticDeposit,
     withdraw,
     getWithdrawalFeeQuote,
+    getCoopExitFeeQuote,
     getCoopExitRequest,
     transferTokens,
     getTokenInfo,

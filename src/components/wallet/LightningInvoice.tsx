@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useLightning, useClipboard } from '@/hooks/useSparkWalletHooks';
+import { LightningReceiveRequest } from '@/types/spark-wallet';
 
 export const LightningInvoice: React.FC = () => {
   const {
@@ -22,7 +23,7 @@ export const LightningInvoice: React.FC = () => {
 
   const { copyToClipboard, copied } = useClipboard();
   const [activeTab, setActiveTab] = useState<'receive' | 'send'>('receive');
-  const [createdInvoice, setCreatedInvoice] = useState<any>(null);
+  const [createdInvoice, setCreatedInvoice] = useState<LightningReceiveRequest | null>(null);
   const [estimatedFee, setEstimatedFee] = useState<number | null>(null);
 
   const handleCreateInvoice = async () => {
